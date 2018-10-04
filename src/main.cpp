@@ -138,14 +138,15 @@ int main() {
           */
 	  auto vars = mpc.Solve(state, pts_car_coeffs);
     
-          double steer_value = vars[6];
-          double throttle_value = vars[7];
+          double steer_value = vars[0] / deg2rad(25);
+          double throttle_value = vars[1];
 
 	  /////	  /////	  /////	  /////	  /////	  /////	  /////	  /////	  /////	  /////	  /////
 	  
 	  /////	  /////	  /////	  /////	  /////	  /////	  /////	  /////	  /////	  /////	  /////
-
-	  
+	  // 
+	  // Send back the controlling signal to car ( simulator )
+	  // 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
@@ -155,7 +156,13 @@ int main() {
           //Display the MPC predicted trajectory 
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
-
+          size_t const N = (vars.size() - 2) / 2;
+	  
+          for( i = 0; i < N; i++ ) {
+            mpc_x_vals.push_back(vars[2 + 2*i]); // first 2 elements are delta and a 
+            mpc_y_vals.push_back(vars[2 + 2*i + 1]); // idex step 
+          }
+	  
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
 
@@ -168,6 +175,10 @@ int main() {
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
+          for (double i = 0; i < 100; i += 3){
+            next_x_vals.push_back(i);
+            next_y_vals.push_back(polyeval(pts_car_coeffs, i));
+          }
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;

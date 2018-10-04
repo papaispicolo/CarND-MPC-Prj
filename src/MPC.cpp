@@ -286,8 +286,23 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   //
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
+  /*
   return {solution.x[x_start + 1],   solution.x[y_start + 1],
           solution.x[psi_start + 1], solution.x[v_start + 1],
           solution.x[cte_start + 1], solution.x[epsi_start + 1],
           solution.x[delta_start],   solution.x[a_start]};
+  */
+
+  // Return result in form of { delta_angle, a_acceleration, x1,y1, x2,y2, ... }
+  // First put steering angle and acceleration ( throattle ) 
+  auto result = {solution.x[delta_start],solution.x[a_start]};
+
+  // Then put the x,y trajectory points
+  for ( int i=0 ; i < N ; i++ ) {
+    result.push_back(solution.x[x_start + i]); // x_i
+    result.push_back(solution.x[y_start + i]); // y_i
+  }
+
+  return result;
+
 }
