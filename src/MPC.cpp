@@ -7,8 +7,8 @@ using CppAD::AD;
 
 // TODO: Set the timestep length and duration
 // 
-size_t N = 10;   // in the lecture default was 25 
-double dt = 0.1; // in the lecture default was 0.05
+size_t N = 6;   // 6 in the lecture default was 25 
+double dt = 0.1; // 0.2 in the lecture default was 0.05
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -26,8 +26,8 @@ const double Lf = 2.67;
 // https://github.com/udacity/CarND-MPC-Quizzes/blob/master/mpc_to_line/solution/MPC.cpp
 //
 // Both the reference cross track and orientation errors are 0.
-// The reference velocity is set to 40 mph.
-double ref_v = 30; // decreased reference speed to 30
+// The reference velocity is set to 45 mph.
+double ref_v = 64; // 100 km/h 
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -53,7 +53,7 @@ class FG_eval {
   // `vars` is a vector containing the variable values (state & actuators).
   void operator()(ADvector& fg, const ADvector& vars) {
     // TODO: implement MPC
-    // `fg` a vector of the cost constraints, `vars` is a vector of variable values (state & actuators)
+    // `fg` a vector of the cost constraints, `vars` is a vector of variable values (state & atuators)
     // NOTE: You'll probably go back and forth between this function and
     // the Solver function below.
     
@@ -80,8 +80,11 @@ class FG_eval {
 
     // Minimize the value gap between sequential actuations.
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
-      fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+      // Tuning sequencial steering to make it smooth
+      // referencing Lesson 19: 10 Tuning MPC
+      // and also to make throatling smooth
+      fg[0] += 180 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+      fg[0] +=  60 * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -141,7 +144,12 @@ class FG_eval {
       // epsi[t] = psi[t] - psides[t-1] + v[t-1] * delta[t-1] / Lf * dt
       fg[1 + x_start + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
       fg[1 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
-      fg[1 + psi_start + t] = psi1 - (psi0 + v0 * delta0 / Lf * dt);
+      // fg[1 + psi_start + t] = psi1 - (psi0 + v0 * delta0 / Lf * dt);
+      // Note!!: if delta is positive we rotate counter-clockwise,
+      // or turn left. In the simulator however, a positive value implies
+      // a right turn and a negative value implies a left turn.
+      // Change the update equation as follows : see the minus sign
+      fg[1 + psi_start + t] = psi1 - (psi0 - v0 * delta0 / Lf * dt);
       fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
       fg[1 + cte_start + t] = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
       fg[1 + epsi_start + t] = epsi1 - ((psi0 - psides0) + v0 * delta0 / Lf * dt);

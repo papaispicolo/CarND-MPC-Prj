@@ -125,26 +125,34 @@ int main() {
 	  // Now we consider position in car coordinate
 	  double car_x = 0;
 	  double car_y = 0;
-	  double car_psi = delta;
+	  // Note if delta is positive we rotate counter-clockwise, or turn left.
+	  // In the simulator however, a positive value implies a right turn and
+	  // a negative value implies a left turn. Thus multiply -1 to correct it in simulation
+	  double car_psi = -1*delta;
 	  double cte = polyeval(pts_car_coeffs, car_x) - car_y;
 	  // Due to the sign starting at 0, the orientation error is -f'(x).
 	  // derivative of coeffs[0] + coeffs[1] * x -> coeffs[1]
-	  double epsi = - atan(pts_car_coeffs[1]);
+	  double epsi = car_psi - atan(pts_car_coeffs[1]);
 
-	  // compute new px py psi v 
+	  // compute new px py psi v
 	  const double latency = 0.1;
+	  // Use the same Lf defined in MPC.cpp
 	  const double Lf = 2.67;
-	  double px_new = v * cos(car_psi) * latency;
-	  double py_new = v * sin(car_psi) * latency;
-	  double psi_new= v * car_psi * latency/Lf;
-	  double v_new  = v + a * latency;
-	  
-          cte = cte + v*sin(epsi)*latency;
-          epsi = epsi + v*delta/Lf*latency;
+	  // compensate current location considering latency
+	  double px_latency = v * cos(car_psi) * latency;
+	  double py_latency = v * sin(car_psi) * latency;
+	  double psi_latency = v * car_psi * latency/Lf;
+	  double v_latency = v + a * latency;
+
+	  //cte t+1 = cte t + vt*sin(epi)*dt, where dt = latency
+          double cte_latency = cte + v*sin(epsi)*latency;
+	  // Lesson 18 : Vehicle Models : 10. Errors
+          double epsi_latency = epsi - v/Lf* delta * latency;
 	  
 	  Eigen::VectorXd state(6);
 	  //state << px, py, psi, v, cte, epsi;
-	  state << px_new, py_new, psi_new, v_new, cte, epsi;
+	  //state << car_x, car_y, car_psi, v, cte, epsi;
+	  state << px_latency, py_latency, psi_latency, v_latency, cte_latency, epsi_latency;
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -153,7 +161,8 @@ int main() {
           *
           */
 	  auto vars = mpc.Solve(state, pts_car_coeffs);
-    
+
+	  // Constraints delta in [-25deg , 25deg] and a in [-1, 1]
           double steer_value = vars[0] / deg2rad(25);
           double throttle_value = vars[1];
 
