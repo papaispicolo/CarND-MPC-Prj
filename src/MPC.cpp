@@ -7,7 +7,7 @@ using CppAD::AD;
 
 // TODO: Set the timestep length and duration
 // 
-size_t N = 12;   // in the lecture default was 25 
+size_t N = 10;   // in the lecture default was 25 
 double dt = 0.1; // in the lecture default was 0.05
 
 // This value assumes the model presented in the classroom is used.
@@ -122,8 +122,12 @@ class FG_eval {
       AD<double> delta0 = vars[delta_start + t - 1];
       AD<double> a0 = vars[a_start + t - 1];
 
-      AD<double> f0 = coeffs[0] + coeffs[1] * x0;
-      AD<double> psides0 = CppAD::atan(coeffs[1]);
+      // In the quizz .. we've considered linear model..
+      // AD<double> f0 = coeffs[0] + coeffs[1] * x0;
+      // AD<double> psides0 = CppAD::atan(coeffs[1]);
+      // In our case we should consider 3rd polynormial
+      AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * CppAD::pow(x0, 2) + coeffs[3] * CppAD::pow(x0, 3);
+      AD<double> psides0 = CppAD::atan(coeffs[1] + 2.0 * coeffs[2] * x0 + 3.0 * coeffs[3] * CppAD::pow(x0, 2));
 
       // Here's `x` to get you started.
       // The idea here is to constraint this value to be 0.
@@ -154,7 +158,7 @@ MPC::~MPC() {}
 
 vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   bool ok = true;
-  size_t i;
+  //size_t i;
   typedef CPPAD_TESTVECTOR(double) Dvector;
 
   // TODO: Set the number of model variables (includes both states and inputs).
@@ -295,7 +299,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   // Return result in form of { delta_angle, a_acceleration, x1,y1, x2,y2, ... }
   // First put steering angle and acceleration ( throattle ) 
-  auto result = {solution.x[delta_start],solution.x[a_start]};
+  vector<double> result = {solution.x[delta_start],solution.x[a_start]};
 
   // Then put the x,y trajectory points
   for ( int i=0 ; i < N ; i++ ) {

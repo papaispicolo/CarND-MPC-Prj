@@ -89,6 +89,14 @@ int main() {
 	  // Get waypoints
           vector<double> ptsx = j[1]["ptsx"];
           vector<double> ptsy = j[1]["ptsy"];
+
+	  // Given the spec from Data.md
+	  // Get control inputs = [ delta, a]
+	  double delta = j[1]["steering_angle"];
+	  double a = j[1]["throttle"];
+
+	  Eigen::VectorXd control(2);
+	  control << delta, a;
 	  
 	  // Get state = [ x, y, psi, v]
           double px = j[1]["x"];
@@ -96,40 +104,48 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 	  
-	  // Get cte and epsi
           // Transforming waypoint coordinates to coordinates in the vehicle's coordinate system
           Eigen::VectorXd ptsx_car(ptsx.size());
           Eigen::VectorXd ptsy_car(ptsy.size());
           for(int i = 0;  i < ptsx.size();  i++ ) {
-
+	    // Consider car is in origin of car cordinate
             // relative distance between map waypoint and car position
             double carcord_x = ptsx[i] - px;
 	    double carcord_y = ptsy[i] - py;
 
-            // Performing the homogeneous transformation from the car's point of view (=base is (0,0))
+            // Homogeneous transformation from the car's point of view (=base is (0,0))
             ptsx_car[i] = 0.0 + cos(-psi) * carcord_x - sin(-psi) * carcord_y;
-            ptsy_car[i] = 0.0 + sin(-psi) * carcord_x + cos(-psi) * carcord_y;
+	    ptsy_car[i] = 0.0 + sin(-psi) * carcord_x + cos(-psi) * carcord_y;
           }
-	  
+
+	  // Get cte and epsi
 	  Eigen::VectorXd pts_car_coeffs = polyfit(ptsx_car,ptsy_car,3);
 	  // The cross track error is calculated by evaluating at polynomial at x, f(x)
 	  // and subtracting y.
-	  double cte = polyeval(pts_car_coeffs, px) - py;
+	  // Now we consider position in car coordinate
+	  double car_x = 0;
+	  double car_y = 0;
+	  double car_psi = delta;
+	  double cte = polyeval(pts_car_coeffs, car_x) - car_y;
 	  // Due to the sign starting at 0, the orientation error is -f'(x).
 	  // derivative of coeffs[0] + coeffs[1] * x -> coeffs[1]
-	  double epsi = psi - atan(pts_car_coeffs[1]);
-	  
-	  // Given the spec from Data.md
-	  // Get control inputs = [ delta, a]
-	  double delta = j[1]["steering_angle"];
-	  double a = j[1]["throttle"];
+	  double epsi = - atan(pts_car_coeffs[1]);
 
+	  // compute new px py psi v 
+	  const double latency = 0.1;
+	  const double Lf = 2.67;
+	  double px_new = v * cos(car_psi) * latency;
+	  double py_new = v * sin(car_psi) * latency;
+	  double psi_new= v * car_psi * latency/Lf;
+	  double v_new  = v + a * latency;
+	  
+          cte = cte + v*sin(epsi)*latency;
+          epsi = epsi + v*delta/Lf*latency;
+	  
 	  Eigen::VectorXd state(6);
-	  state << px, py, psi, v, cte, epsi;
-	  
-	  Eigen::VectorXd control(2);
-	  control << delta, a;
-	  
+	  //state << px, py, psi, v, cte, epsi;
+	  state << px_new, py_new, psi_new, v_new, cte, epsi;
+
           /*
           * TODO: Calculate steering angle and throttle using MPC.
           *
@@ -158,7 +174,7 @@ int main() {
           vector<double> mpc_y_vals;
           size_t const N = (vars.size() - 2) / 2;
 	  
-          for( i = 0; i < N; i++ ) {
+          for(int i = 0; i < N; i++ ) {
             mpc_x_vals.push_back(vars[2 + 2*i]); // first 2 elements are delta and a 
             mpc_y_vals.push_back(vars[2 + 2*i + 1]); // idex step 
           }
@@ -175,14 +191,13 @@ int main() {
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
-          for (double i = 0; i < 100; i += 3){
-            next_x_vals.push_back(i);
-            next_y_vals.push_back(polyeval(pts_car_coeffs, i));
+          for (int i = 0; i < 100; i += 3){
+            next_x_vals.push_back((double)i);
+            next_y_vals.push_back(polyeval(pts_car_coeffs, (double)i));
           }
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
-
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           std::cout << msg << std::endl;
