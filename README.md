@@ -175,6 +175,23 @@ But changed the linear model in the quizz to our 3rd polynomial model
 
 Then the model was computed as shown below
 
+
+Note : as explained in the project hint
+(https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/f1820894-8322-4bb3-81aa-b26b3c6dcbaf/lessons/b1ff3be0-c904-438e-aad3-2b5379f0e0c3/concepts/929d26d4-f93c-429c-8bd3-728154e44f82)
+
+the psi update equation was change slightly regarding the sign of
+delta
+
+
+```c
+	fg[1 + psi_start + t] = psi1 - (psi0 + v0 * delta0 / Lf * dt);
+```
+      // Note!!: if delta is positive we rotate counter-clockwise,
+      // or turn left. In the simulator however, a positive value implies
+      // a right turn and a negative value implies a left turn.
+      // Change the update equation as follows : see the minus sign
+      fg[1 + psi_start + t] = psi1 - (psi0 - v0 * delta0 / Lf * dt);
+
 ```c
       // Here's `x` to get you started.
       // The idea here is to constraint this value to be 0.
