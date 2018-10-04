@@ -1,108 +1,186 @@
-# CarND-Controls-MPC
+# Term2 - Project 5 : CarND-Controls-MPC 
+
 Self-Driving Car Engineer Nanodegree Program
 
----
+Project 5 - MPC Control Project
 
-## Dependencies
+# Project Rubric
 
-* cmake >= 3.5
- * All OSes: [click here for installation instructions](https://cmake.org/install/)
-* make >= 4.1(mac, linux), 3.81(Windows)
-  * Linux: make is installed by default on most Linux distros
-  * Mac: [install Xcode command line tools to get make](https://developer.apple.com/xcode/features/)
-  * Windows: [Click here for installation instructions](http://gnuwin32.sourceforge.net/packages/make.htm)
-* gcc/g++ >= 5.4
-  * Linux: gcc / g++ is installed by default on most Linux distros
-  * Mac: same deal as make - [install Xcode command line tools]((https://developer.apple.com/xcode/features/)
-  * Windows: recommend using [MinGW](http://www.mingw.org/)
-* [uWebSockets](https://github.com/uWebSockets/uWebSockets)
-  * Run either `install-mac.sh` or `install-ubuntu.sh`.
-  * If you install from source, checkout to commit `e94b6e1`, i.e.
-    ```
-    git clone https://github.com/uWebSockets/uWebSockets
-    cd uWebSockets
-    git checkout e94b6e1
-    ```
-    Some function signatures have changed in v0.14.x. See [this PR](https://github.com/udacity/CarND-MPC-Project/pull/3) for more details.
+## Compilation
 
-* **Ipopt and CppAD:** Please refer to [this document](https://github.com/udacity/CarND-MPC-Project/blob/master/install_Ipopt_CppAD.md) for installation instructions.
-* [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page). This is already part of the repo so you shouldn't have to worry about it.
-* Simulator. You can download these from the [releases tab](https://github.com/udacity/self-driving-car-sim/releases).
-* Not a dependency but read the [DATA.md](./DATA.md) for a description of the data sent back from the simulator.
+After cloning this repo.
+
+```
+1. mkdir build
+2. cd build
+3. cmake ..
+4. make
+5. ./mpc
+```
+
+## Implementation
+
+Reference speed = 62 MPH ( approx. 100Km/h )
+
+To achieve this speed, N and dt was set 6 and 0.1 respectively.
+
+( The parameter values were found empirically, if N is too high too
+much errors can be introduced, likewise if N is too small considering
+aimed speed, it is incomplete thus it can introduce high error
+rate. Thus outputs wrong steering angle and throttle. )
 
 
-## Basic Build Instructions
+--------
 
-1. Clone this repo.
-2. Make a build directory: `mkdir build && cd build`
-3. Compile: `cmake .. && make`
-4. Run it: `./mpc`.
+Given the state
 
-## Tips
+```
+	  // Get state = [ x, y, psi, v]
+          double px = j[1]["x"];
+          double py = j[1]["y"];
+          double psi = j[1]["psi"];
+          double v = j[1]["speed"];
+```
 
-1. It's recommended to test the MPC on basic examples to see if your implementation behaves as desired. One possible example
-is the vehicle starting offset of a straight line (reference). If the MPC implementation is correct, after some number of timesteps
-(not too many) it should find and track the reference line.
-2. The `lake_track_waypoints.csv` file has the waypoints of the lake track. You could use this to fit polynomials and points and see of how well your model tracks curve. NOTE: This file might be not completely in sync with the simulator so your solution should NOT depend on it.
-3. For visualization this C++ [matplotlib wrapper](https://github.com/lava/matplotlib-cpp) could be helpful.)
-4.  Tips for setting up your environment are available [here](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/23d376c7-0195-4276-bdf0-e02f1f3c665d)
-5. **VM Latency:** Some students have reported differences in behavior using VM's ostensibly a result of latency.  Please let us know if issues arise as a result of a VM environment.
+the control
 
-## Editor Settings
+```
+	  // Get control inputs = [ delta, a]
+	  double delta = j[1]["steering_angle"];
+	  double a = j[1]["throttle"];
+```
 
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
+and the latency of 100ms = 0.1s
 
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
+```
+	  // compute new px py psi v
+	  const double latency = 0.1;
+	  // Use the same Lf defined in MPC.cpp
+	  const double Lf = 2.67;
+```
 
-## Code Style
+and reference trajectory (waypoints)
 
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
+```
+	  // Get waypoints
+          vector<double> ptsx = j[1]["ptsx"];
+          vector<double> ptsy = j[1]["ptsy"];
+```
 
-## Project Instructions and Rubric
+-----------
 
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
+Polynomial Fitting
 
-More information is only accessible by people who are already enrolled in Term 2
-of CarND. If you are enrolled, see [the project page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/f1820894-8322-4bb3-81aa-b26b3c6dcbaf/lessons/b1ff3be0-c904-438e-aad3-2b5379f0e0c3/concepts/1a2255a0-e23c-44cf-8d41-39b8a3c8264a)
-for instructions and the project rubric.
+In the main.cpp given the ptsx trajectory and the car position in the
+map cordinate, computed relative cordinate location ( in terms of
+car, setting current car position as origin ( 0.0 , 0.0 )
 
-## Hints!
+```
+          vector<double> ptsx = j[1]["ptsx"];
+          vector<double> ptsy = j[1]["ptsy"];
+		  
+          // Transforming waypoint coordinates to coordinates in the vehicle's coordinate system
+          Eigen::VectorXd ptsx_car(ptsx.size());
+          Eigen::VectorXd ptsy_car(ptsy.size());
+          for(int i = 0;  i < ptsx.size();  i++ ) {
+	    // Consider car is in origin of car cordinate
+            // relative distance between map waypoint and car position
+            double carcord_x = ptsx[i] - px;
+	    double carcord_y = ptsy[i] - py;
 
-* You don't have to follow this directory structure, but if you do, your work
-  will span all of the .cpp files here. Keep an eye out for TODOs.
+            // Homogeneous transformation from the car's point of view (=base is (0,0))
+            ptsx_car[i] = 0.0 + cos(-psi) * carcord_x - sin(-psi) * carcord_y;
+	    ptsy_car[i] = 0.0 + sin(-psi) * carcord_x + cos(-psi) * carcord_y;
+          }
+```
 
-## Call for IDE Profiles Pull Requests
+Then applied 3rd order polynomial fitting
 
-Help your fellow students!
+```
+Eigen::VectorXd pts_car_coeffs = polyfit(ptsx_car,ptsy_car,3);
+```
 
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to we ensure
-that students don't feel pressured to use one IDE or another.
+then computed cte / epsi
 
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
+```
+	  // Now we consider position in car coordinate
+	  double car_x = 0;
+	  double car_y = 0;
+	  // Note if delta is positive we rotate counter-clockwise, or turn left.
+	  // In the simulator however, a positive value implies a right turn and
+	  // a negative value implies a left turn. Thus multiply -1 to correct it in simulation
+	  double car_psi = -1*delta;
+	  double cte = polyeval(pts_car_coeffs, car_x) - car_y;
+	  // Due to the sign starting at 0, the orientation error is -f'(x).
+	  // derivative of coeffs[0] + coeffs[1] * x -> coeffs[1]
+	  double epsi = car_psi - atan(pts_car_coeffs[1]);
+```
 
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
+Upon above information, computed current location considering the latency
 
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
+```
+	  // compensate current location considering latency
+	  double px_latency = v * cos(car_psi) * latency;
+	  double py_latency = v * sin(car_psi) * latency;
+	  double psi_latency = v * car_psi * latency/Lf;
+	  double v_latency = v + a * latency;
 
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
+      //cte t+1 = cte t + vt*sin(epi)*dt, where dt = latency
+      double cte_latency = cte + v*sin(epsi)*latency;
+	  // Lesson 18 : Vehicle Models : 10. Errors
+      double epsi_latency = epsi - v/Lf* delta * latency;
+```
 
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
+These values were used as state
 
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
+```
+	  Eigen::VectorXd state(6);
+	  //state << px, py, psi, v, cte, epsi;
+	  //state << car_x, car_y, car_psi, v, cte, epsi;
+	  state << px_latency, py_latency, psi_latency, v_latency, cte_latency, epsi_latency;
+```
+
+Then using MPC solver computed optimal (predicted) the steering angle and throttle
+
+``` 
+          /*
+          * TODO: Calculate steering angle and throttle using MPC.
+          *
+          * Both are in between [-1, 1].
+          *
+          */
+	  auto vars = mpc.Solve(state, pts_car_coeffs);
+
+	  // Constraints delta in [-25deg , 25deg] and a in [-1, 1]
+          double steer_value = vars[0] / deg2rad(25);
+          double throttle_value = vars[1];
+```
+
+
+### Simulation result
+
+It achieved autonomous driving at speed of 62 MPH ( approx. 100Km/h )
+
+To achieve smooth driving, sequential steering and throttle tuning is 
+applied ( by referencing Lesson 19: 10. Tuning MPC ) 
+
+
+in MPC.cpp
+
+```
+    // Minimize the value gap between sequential actuations.
+    for (int t = 0; t < N - 2; t++) {
+      // Tuning sequencial steering to make it smooth
+      // referencing Lesson 19: 10 Tuning MPC
+      // and also to make throatling smooth
+      fg[0] += 180 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+      fg[0] +=  60 * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+    }
+```
+
+![](./MPC_result1.png)
+
+![](./MPC_result2.png)
+
+
+
