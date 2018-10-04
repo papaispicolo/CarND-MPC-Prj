@@ -34,7 +34,7 @@ rate. Thus outputs wrong steering angle and throttle. )
 
 Given the state
 
-```
+```c
 	  // Get state = [ x, y, psi, v]
           double px = j[1]["x"];
           double py = j[1]["y"];
@@ -44,7 +44,7 @@ Given the state
 
 the control
 
-```
+```c
 	  // Get control inputs = [ delta, a]
 	  double delta = j[1]["steering_angle"];
 	  double a = j[1]["throttle"];
@@ -52,7 +52,7 @@ the control
 
 and the latency of 100ms = 0.1s
 
-```
+```c
 	  // compute new px py psi v
 	  const double latency = 0.1;
 	  // Use the same Lf defined in MPC.cpp
@@ -61,7 +61,7 @@ and the latency of 100ms = 0.1s
 
 and reference trajectory (waypoints)
 
-```
+```c
 	  // Get waypoints
           vector<double> ptsx = j[1]["ptsx"];
           vector<double> ptsy = j[1]["ptsy"];
@@ -75,7 +75,7 @@ In the main.cpp given the ptsx trajectory and the car position in the
 map cordinate, computed relative cordinate location ( in terms of
 car, setting current car position as origin ( 0.0 , 0.0 )
 
-```
+```c
           vector<double> ptsx = j[1]["ptsx"];
           vector<double> ptsy = j[1]["ptsy"];
 		  
@@ -96,13 +96,13 @@ car, setting current car position as origin ( 0.0 , 0.0 )
 
 Then applied 3rd order polynomial fitting
 
-```
+```c
 Eigen::VectorXd pts_car_coeffs = polyfit(ptsx_car,ptsy_car,3);
 ```
 
 then computed cte / epsi
 
-```
+```c
 	  // Now we consider position in car coordinate
 	  double car_x = 0;
 	  double car_y = 0;
@@ -118,7 +118,7 @@ then computed cte / epsi
 
 Upon above information, computed current location considering the latency
 
-```
+```c
 	  // compensate current location considering latency
 	  double px_latency = v * cos(car_psi) * latency;
 	  double py_latency = v * sin(car_psi) * latency;
@@ -133,7 +133,7 @@ Upon above information, computed current location considering the latency
 
 These values were used as state
 
-```
+```c
 	  Eigen::VectorXd state(6);
 	  //state << px, py, psi, v, cte, epsi;
 	  //state << car_x, car_y, car_psi, v, cte, epsi;
@@ -142,7 +142,7 @@ These values were used as state
 
 Then using MPC solver computed optimal (predicted) the steering angle and throttle
 
-``` 
+```c
           /*
           * TODO: Calculate steering angle and throttle using MPC.
           *
@@ -167,7 +167,7 @@ applied ( by referencing Lesson 19: 10. Tuning MPC )
 
 in MPC.cpp
 
-```
+```c
     // Minimize the value gap between sequential actuations.
     for (int t = 0; t < N - 2; t++) {
       // Tuning sequencial steering to make it smooth
